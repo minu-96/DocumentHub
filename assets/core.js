@@ -120,7 +120,7 @@ function md(src) {
    SETTINGS + AI
    ═══════════════════════════════════════════════════════════ */
 const AI_PROVIDERS = {
-  gemini: { name: 'Gemini', vendor: 'Google · 무료 등급 있음', models: ['gemini-3.5-flash-lite', 'gemini-2.5-flash-lite', 'gemini-3.8-flash'], def: 'gemini-3.5-flash-lite', keyUrl: 'https://aistudio.google.com/apikey' },
+  gemini: { name: 'Gemini', vendor: 'Google', models: ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-4-hydrogen'], def: 'gemini-3.5-flash-lite', keyUrl: 'https://aistudio.google.com/apikey' },
   claude: { name: 'Claude', vendor: 'Anthropic · 유료', models: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'], def: 'claude-haiku-5-5', keyUrl: 'https://console.anthropic.com/' },
   openai: { name: 'GPT', vendor: 'OpenAI · 유료', models: ['gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol'], def: 'gpt-6-luna', keyUrl: 'https://platform.openai.com/api-keys' },
 };
@@ -172,14 +172,14 @@ const Settings = {
         <div class="btn-row" style="margin-top:8px"><button class="btn btn-xs" onclick="Settings.test('${k}')">연결 테스트</button><span id="set-test-${k}" class="muted" style="font-size:12px"></span></div>
       </div>`;
     modalShell('settingsModal', 'AI · 작성자 설정', `
-      ${Shared.ok ? `<div class="co co-ok"><span class="co-ic">✓</span><div><b>공용 AI를 쓸 수 있습니다 — 아무것도 설정하지 않아도 됩니다.</b><br>이 사이트 운영자가 제공하는 무료 한도 안에서 동작합니다. 한도가 소진되면 그날은 멈추고, 입력한 문서 내용은 AI 제공사(Google)로 전송되며 무료 등급 특성상 서비스 개선에 쓰일 수 있습니다. 공개하면 안 되는 문서는 아래에 본인 키를 넣어 쓰세요.</div></div>`
-        : `<div class="co co-tip"><span class="co-ic">i</span><div>이 환경에서는 공용 AI를 쓸 수 없습니다(파일로 직접 열었거나 서버에 키가 설정되지 않음). 아래에 본인 API 키를 하나 넣으면 AI 기능이 켜집니다. Gemini는 무료 등급 키로도 동작합니다.</div></div>`}
+      ${Shared.ok ? `<div class="co co-ok"><span class="co-ic">✓</span><div><b>공용 AI를 쓸 수 있습니다 — 아무것도 설정하지 않아도 됩니다.</b><br>운영자가 비용을 부담하므로 1인당 하루 사용 횟수에 제한이 있습니다(전체 검토는 더 적게). AI를 실행하면 해당 문서 내용이 이 사이트 서버를 거쳐 Google Gemini로 전송됩니다. 공개하면 안 되는 문서는 아래에 본인 키를 넣어 쓰세요.</div></div>`
+        : `<div class="co co-tip"><span class="co-ic">i</span><div>이 환경에서는 공용 AI를 쓸 수 없습니다(파일로 직접 열었거나 서버에 키가 설정되지 않음). 아래에 본인 API 키를 하나 넣으면 AI 기능이 켜집니다.</div></div>`}
       <div class="co co-warn"><span class="co-ic">!</span><div>본인 API 키는 <b>이 브라우저에만</b> 저장되고 문서 파일·공유 링크에는 들어가지 않습니다. 공용 PC에서는 사용 후 지우세요.</div></div>
       <div class="f" style="margin-bottom:14px"><div class="f-lab">기본 AI</div>
         <div class="seg" id="set-prov">${[['auto', '자동'], ...(Shared.ok ? [['shared', '공용 AI']] : []), ...Object.entries(AI_PROVIDERS).map(([k, p]) => [k, p.name])].map(([k, l]) => `<button type="button" data-p="${k}" class="${s.provider === k ? 'on' : ''}">${l}</button>`).join('')}</div>
         <div class="f-hint">자동: 본인 키가 있으면 그것을, 없으면 공용 AI를 씁니다.</div></div>
       ${Object.entries(AI_PROVIDERS).map(([k, p]) => provRow(k, p)).join('')}
-      <div class="f-hint" style="margin-bottom:16px">기본 모델은 2026년 11월 기준 각 사에서 가장 저렴한 모델입니다. 모델이 종료되면 공식 문서의 최신 ID로 바꿔 넣으세요.</div>
+      <div class="f-hint" style="margin-bottom:16px">본인 키의 기본 모델은 2026년 11월 기준 각 사의 저가 모델입니다. 더 깊은 검토가 필요하면 상위 모델 ID로 바꾸세요. 모델이 종료되면 공식 문서의 최신 ID로 바꿔 넣으세요.</div>
       <div class="grid"><div class="f half"><div class="f-lab">기본 작성자</div><input id="set-author" value="${esc(s.author)}" placeholder="출력물 표지에 들어갈 이름"></div>
       <div class="f half"><div class="f-lab">기본 팀 / 소속</div><input id="set-team" value="${esc(s.team)}" placeholder="예: 스튜디오 OO / OO대학교"></div></div>`,
       `<button class="btn btn-danger btn-sm" onclick="Settings.clearKeys()">키 모두 삭제</button><span style="flex:1"></span><button class="btn" onclick="closeModal('settingsModal')">취소</button><button class="btn btn-pri" onclick="Settings.commit()">저장</button>`);
@@ -208,10 +208,10 @@ const Settings = {
 };
 
 const AI = {
-  async call({ provider, system, messages, maxTokens = 4096 }) {
+  async call({ provider, system, messages, maxTokens = 4096, tier = 'lite' }) {
     const s = Settings.get(); const p = Settings.resolve(provider);
-    if (!p) throw new Error('AI를 쓸 수 없습니다. ⚙ 설정에서 API 키를 입력하세요. (키가 없으면: Gemini 무료 키 발급 가능)');
-    if (p === 'shared') return AI.callShared({ system, messages, maxTokens });
+    if (!p) throw new Error('AI를 쓸 수 없습니다. ⚙ 설정에서 API 키를 입력하세요. ');
+    if (p === 'shared') return AI.callShared({ system, messages, maxTokens, tier });
     const key = s.keys[p]; const model = s.models[p];
     if (!key) throw new Error(`${AI_PROVIDERS[p].name} API 키가 없습니다. 상단 ⚙ 설정에서 입력하세요.`);
     let res, d;
@@ -254,9 +254,9 @@ const AI = {
       throw e;
     }
   },
-  async callShared({ system, messages, maxTokens }) {
+  async callShared({ system, messages, maxTokens, tier }) {
     let res, d;
-    try { res = await fetch('api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ system, messages, maxTokens }) }); d = await res.json(); }
+    try { res = await fetch('api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ system, messages, maxTokens, tier }) }); d = await res.json(); }
     catch (e) { throw new Error('공용 AI 서버에 연결하지 못했습니다. 잠시 후 다시 시도하거나 ⚙ 설정에서 본인 키를 쓰세요.'); }
     if (!res.ok || d.error) throw new Error(d.error || `공용 AI 오류 (${res.status})`);
     return d.text;
@@ -797,7 +797,7 @@ function openAbout() {
   modalShell('aboutModal', '데이터와 개인정보', `<div class="md" style="font-size:13.5px">
     <h4>문서</h4><p>작성한 문서는 이 브라우저의 저장 공간(localStorage)에만 기록됩니다. 운영자를 포함해 누구도 볼 수 없고, 서버로 전송되지 않습니다. 현재 사용량 ${(bytes / 1024).toFixed(0)}KB (브라우저 한도는 보통 약 5MB).</p>
     <h4>AI 기능을 쓸 때</h4><p>AI 검토 · 채팅 · 초안 채우기를 실행하면 그때 <b>해당 문서의 내용이 AI 제공사로 전송</b>됩니다.</p>
-    <ul><li><b>공용 AI</b>: 이 사이트의 서버를 거쳐 Google Gemini로 전달됩니다. 서버는 내용을 저장하지 않고, 남용 방지를 위해 IP별 하루 사용 횟수만 셉니다. 무료 등급으로 운영되어 Google 정책상 입력이 서비스 개선에 쓰일 수 있습니다.</li>
+    <ul><li><b>공용 AI</b>: 이 사이트의 서버를 거쳐 Google Gemini로 전달됩니다. 서버는 내용을 저장하지 않고, 남용 방지를 위해 IP별 하루 사용 횟수만 셉니다. 전달된 내용의 처리 방식은 Google의 Gemini API 약관을 따릅니다.</li>
     <li><b>본인 API 키</b>: 브라우저에서 해당 회사(Google · Anthropic · OpenAI)로 직접 전송되며 이 사이트 서버를 거치지 않습니다. 키는 이 브라우저에만 저장됩니다.</li></ul>
     <p>미공개 프로젝트 · 개인정보가 들어간 문서는 본인 키를 쓰거나 AI 기능을 쓰지 않는 것을 권합니다. AI의 지적은 틀릴 수 있으니 수치와 법규는 직접 확인하세요.</p>
     <h4>공유 링크</h4><p>문서 내용이 링크 주소 안에 압축되어 들어갑니다. 서버에 저장되지 않지만, 링크를 가진 사람은 누구나 읽을 수 있습니다.</p>

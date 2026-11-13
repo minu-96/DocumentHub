@@ -4,15 +4,25 @@
  * 방문자가 API 키 없이 AI 검토를 쓸 수 있게, 서버에 넣어 둔 Gemini 키로 대신 호출한다.
  * 키는 Cloudflare 환경 변수(Secret)에만 있고 브라우저로 내려가지 않는다.
  *
+ * 모델을 일의 무게에 따라 둘로 나눠 쓴다.
+ *   lite — 섹션 검토 · 초안 채우기 · 채팅 (짧고 잦은 요청)
+ *   deep — 문서 전체 검토 (길고 추론이 필요한 요청)
+ *
  * 환경 변수
- *   GEMINI_API_KEY  (필수, Secret)  Google AI Studio에서 발급한 키. 결제를 연결하지 않은 무료 등급 키를 쓰면
- *                                   한도를 넘어도 과금되지 않고 그날 요청이 거절될 뿐이다.
- *   GEMINI_MODEL    (선택)          기본 gemini-3.5-flash-lite
- *   DAILY_LIMIT     (선택)          IP당 하루 요청 수. 기본 30
+ *   GEMINI_API_KEY     (필수, Secret)  결제가 연결된 Google Cloud 프로젝트의 Gemini API 키
+ *   GEMINI_MODEL       (선택)          lite 모델. 기본 gemini-3.5-flash-lite
+ *   GEMINI_MODEL_DEEP  (선택)          deep 모델. 기본 gemini-3.8-flash
+ *   DAILY_LIMIT        (선택)          IP당 하루 lite 요청 수. 기본 30
+ *   DAILY_LIMIT_DEEP   (선택)          IP당 하루 deep 요청 수. 기본 6
  * KV 바인딩 (선택)
- *   RATE            있으면 IP당 하루 한도를 정확히 센다. 없으면 서버 인스턴스 메모리로 대략 센다.
+ *   RATE               있으면 IP당 하루 한도를 정확히 센다. 없으면 서버 인스턴스 메모리로 대략 센다.
+ *
+ * 후불 결제이므로 Google Cloud 콘솔에서 예산 알림을 걸어 두고, 위 한도로 1인당 사용량을 묶는다.
  */
-const FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite'];
+const TIERS = {
+  lite: { env: 'GEMINI_MODEL', fallback: ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'], limitEnv: 'DAILY_LIMIT', limit: 30, label: 'AI' },
+  deep: { env: 'GEMINI_MODEL_DEEP', fallback: ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'], limitEnv: 'DAILY_LIMIT_DEEP', limit: 6, label: '전체 검토' },
+};
 const MAX_INPUT_CHARS = 120000;
 const MAX_OUTPUT_TOKENS = 6000;
 const mem = new Map(); // key → count (인스턴스가 살아 있는 동안만)
@@ -20,7 +30,7 @@ const mem = new Map(); // key → count (인스턴스가 살아 있는 동안만
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 
 export async function onRequestGet({ env }) {
-  return json({ ok: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || FALLBACK_MODELS[0] });
+  return json({ ok: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || TIERS.lite.fallback[0], deepModel: env.GEMINI_MODEL_DEEP || TIERS.deep.fallback[0] });
 }
 
 export async function onRequestPost({ request, env }) {
@@ -38,13 +48,14 @@ export async function onRequestPost({ request, env }) {
   if (size > MAX_INPUT_CHARS) return json({ error: '문서가 너무 깁니다. 섹션별 검토를 쓰거나 본인 API 키를 사용하세요.' }, 413);
 
   // IP당 하루 한도
-  const limit = parseInt(env.DAILY_LIMIT || '30', 10);
+  const tierName = body.tier === 'deep' ? 'deep' : 'lite'; const tier = TIERS[tierName];
+  const limit = parseInt(env[tier.limitEnv] || String(tier.limit), 10);
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const key = `r:${new Date().toISOString().slice(0, 10)}:${ip}`;
+  const key = `r:${tierName}:${new Date().toISOString().slice(0, 10)}:${ip}`;
   let used = 0;
   if (env.RATE) { used = parseInt((await env.RATE.get(key)) || '0', 10); }
   else { used = mem.get(key) || 0; if (mem.size > 5000) mem.clear(); }
-  if (used >= limit) return json({ error: `오늘 공용 AI 사용 한도(${limit}회)를 다 썼습니다. 내일 다시 쓰거나 설정에서 본인 API 키를 넣으세요.` }, 429);
+  if (used >= limit) return json({ error: `오늘 공용 ${tier.label} 한도(${limit}회)를 다 썼습니다. 내일 다시 쓰거나 설정에서 본인 API 키를 넣으세요.` }, 429);
   if (env.RATE) await env.RATE.put(key, String(used + 1), { expirationTtl: 90000 }); else mem.set(key, used + 1);
 
   const payload = {
@@ -52,7 +63,7 @@ export async function onRequestPost({ request, env }) {
     contents: messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
     generationConfig: { maxOutputTokens: Math.min(parseInt(body.maxTokens, 10) || 4096, MAX_OUTPUT_TOKENS) },
   };
-  const models = [...new Set([env.GEMINI_MODEL, ...FALLBACK_MODELS].filter(Boolean))];
+  const models = [...new Set([env[tier.env], ...tier.fallback].filter(Boolean))];
   let lastErr = 'AI 호출에 실패했습니다.';
   for (const model of models) {
     let res, d;
@@ -63,11 +74,11 @@ export async function onRequestPost({ request, env }) {
       d = await res.json();
     } catch (e) { lastErr = 'AI 서버에 연결하지 못했습니다.'; continue; }
     if (res.status === 404) { lastErr = `모델 ${model}을 찾을 수 없습니다.`; continue; } // 종료된 모델이면 다음 후보로
-    if (res.status === 429) return json({ error: '오늘 공용 AI의 무료 한도가 모두 소진되었습니다. 내일 다시 쓰거나 설정에서 본인 API 키를 넣으세요.' }, 429);
+    if (res.status === 429) return json({ error: '지금 공용 AI 요청이 몰려 처리하지 못했습니다. 잠시 후 다시 시도하거나 설정에서 본인 API 키를 넣으세요.' }, 429);
     if (!res.ok || d.error) return json({ error: 'AI 오류: ' + String(d.error?.message || res.status).slice(0, 200) }, 502);
     const text = (d.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
     if (!text) return json({ error: '빈 응답입니다 (' + (d.candidates?.[0]?.finishReason || d.promptFeedback?.blockReason || '사유 불명') + ').' }, 502);
-    return json({ text, model });
+    return json({ text, model, tier: tierName });
   }
   return json({ error: lastErr }, 502);
 }

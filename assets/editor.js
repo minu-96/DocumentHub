@@ -505,7 +505,7 @@ async function runSectionAI() {
 function openReviewAll() {
   const ps = App.tpl.personas;
   modalShell('reviewModal', 'AI 전체 검토', `
-    <div class="f-hint" style="margin-bottom:12px">선택한 관점마다 문서 전체를 따로 검토합니다. 칭찬은 빼고 문제점·누락·근거 없는 주장 중심으로 답하도록 설정되어 있습니다. AI도 틀릴 수 있으니 수치·법규 지적은 직접 확인하세요.</div>
+    <div class="f-hint" style="margin-bottom:12px">선택한 관점마다 문서 전체를 따로 검토합니다. 공용 AI에서는 전체 검토에 상위 모델을 쓰는 대신 하루 횟수가 적으니(관점 1개 = 1회), 평소에는 섹션별 검토를 쓰고 전체 검토는 문서가 어느 정도 찼을 때 쓰세요. 칭찬은 빼고 문제점·누락·근거 없는 주장 중심으로 답하도록 설정되어 있습니다. AI도 틀릴 수 있으니 수치·법규 지적은 직접 확인하세요.</div>
     <div class="f-lab">검토 관점</div>
     <div class="checks" id="rvPersonas" style="margin-bottom:14px">${ps.map((pid, i) => `<label class="ck ${i < 2 ? 'on' : ''}"><input type="checkbox" value="${pid}" ${i < 2 ? 'checked' : ''} onchange="this.parentNode.classList.toggle('on',this.checked)"><span>${PERSONAS[pid].icon} ${esc(PERSONAS[pid].name)}<small>${esc(PERSONAS[pid].desc || '')}</small></span></label>`).join('')}</div>
     <div class="f-lab">AI</div>${AI.provPicker('rvProv')}
@@ -522,7 +522,7 @@ async function runReviewAll() {
     const p = PERSONAS[pid]; const card = document.createElement('div'); card.className = 'ai-out';
     card.innerHTML = `<div class="ai-out-hd"><span class="spin"></span> ${p.icon} ${esc(p.name)}</div><div class="ai-out-bd md"></div>`; out.appendChild(card);
     try {
-      const r = await AI.call({ provider: prov, system: personaSystem(pid, `검토 대상 양식: ${App.tpl.name}. ${App.tpl.aiContext || ''}`), messages: [{ role: 'user', content: text }] });
+      const r = await AI.call({ provider: prov, tier: 'deep', system: personaSystem(pid, `검토 대상 양식: ${App.tpl.name}. ${App.tpl.aiContext || ''}`), messages: [{ role: 'user', content: text }] });
       card.querySelector('.ai-out-hd').innerHTML = `${p.icon} ${esc(p.name)}<span style="flex:1"></span><button class="btn btn-xs" onclick="chatFrom(this)">채팅으로 이어가기</button>`;
       card.dataset.raw = r; card.querySelector('.ai-out-bd').innerHTML = md(r);
     } catch (e) { card.querySelector('.ai-out-hd').textContent = `${p.icon} ${p.name} — 실패`; card.querySelector('.ai-out-bd').innerHTML = `<span style="color:var(--err)">${esc(e.message)}</span>`; if (/키가 없/.test(e.message)) break; }

@@ -33,26 +33,31 @@ functions/api/ai.js   공용 AI 프록시 (Cloudflare Pages Functions)
 2. Build 설정: Framework preset **None**, Build command **비움**, Build output directory **`/`**
 3. **Save and Deploy** → `https://<프로젝트 이름>.pages.dev` 주소가 생깁니다. 이후 `main`에 push하면 자동 재배포됩니다.
 
-## 공용 AI 켜기 (선택 · 비용 0원으로 운영 가능)
+## 공용 AI 켜기 (선택)
 
 방문자가 키 없이 AI 검토를 쓰게 하려면 서버에 Gemini 키를 넣습니다. 키는 브라우저로 내려가지 않습니다.
 
-1. [Google AI Studio](https://aistudio.google.com/apikey)에서 API 키 발급. **결제(billing)를 연결하지 않은 프로젝트의 키**를 쓰면 무료 한도를 넘어도 과금되지 않고 그날 요청만 거절됩니다.
+1. 결제가 연결된 Google Cloud 프로젝트에서 Gemini API 키 발급
 2. Cloudflare Pages 프로젝트 → **Settings → Variables and Secrets** → `GEMINI_API_KEY` 를 **Secret**으로 추가 → 재배포
-3. 선택 변수: `GEMINI_MODEL`(기본 `gemini-3.5-flash-lite`), `DAILY_LIMIT`(IP당 하루 요청 수, 기본 30)
-4. 선택: KV 네임스페이스를 만들어 `RATE` 이름으로 바인딩하면 IP당 한도를 정확히 셉니다.
+3. Google Cloud 콘솔 → 결제 → **예산 및 알림**에서 월 예산 알림 설정 (후불이라 자동으로 멈추지 않습니다)
 
-무료 등급 키는 Google 정책상 입력이 서비스 개선에 쓰일 수 있어, 사이트 안에서 이 점을 안내하고 민감한 문서는 본인 키를 쓰도록 권합니다.
+일의 무게에 따라 모델을 둘로 나눠 씁니다.
+
+| 구분 | 쓰이는 곳 | 기본 모델 | IP당 하루 한도 | 바꾸는 변수 |
+|---|---|---|---|---|
+| lite | 섹션 검토 · 초안 채우기 · 채팅 | `gemini-3.5-flash-lite` | 30회 | `GEMINI_MODEL`, `DAILY_LIMIT` |
+| deep | 문서 전체 검토 | `gemini-3.8-flash` | 6회 | `GEMINI_MODEL_DEEP`, `DAILY_LIMIT_DEEP` |
+
+선택: KV 네임스페이스를 만들어 `RATE` 이름으로 바인딩하면 IP당 한도를 정확히 셉니다. 바인딩이 없으면 서버 인스턴스 메모리로 대략 세므로, 공개 운영 시에는 바인딩을 권합니다.
 
 ### 비용 참고 (2026-11 기준, 변동 가능)
 
-| 모델 | 입력 / 출력 (100만 토큰당) | 무료 등급 |
+| 모델 | 입력 / 출력 (100만 토큰당) | 요청 1회 (대략) |
 |---|---|---|
-| gemini-3.5-flash-lite | $0.30 / $2.50 | 있음 |
-| gemini-2.5-flash-lite | $0.10 / $0.40 | 있음 |
-| claude-haiku-5-5 | $0.10 / $0.50 | 없음 |
+| gemini-3.5-flash-lite | $0.30 / $2.50 | 섹션 검토 약 $0.002 |
+| gemini-3.8-flash | $0.75 / $3.75 (2027-01-01부터 $1.50 / $7.50) | 전체 검토 약 $0.012 → $0.023 |
 
-문서 전체 검토 1회는 대략 입력 8천 · 출력 1.5천 토큰으로, 유료로 써도 1회에 약 10원 안팎입니다.
+한 사람이 하루 한도를 전부 써도 약 $0.13(1월 이후 약 $0.20)입니다. 모델이 답하기 전 생각에 쓴 토큰이 출력으로 청구되면 이보다 더 나올 수 있습니다.
 
 ## 데이터
 

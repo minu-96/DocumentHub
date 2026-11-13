@@ -72,7 +72,7 @@ function hubRender() {
 
     <div class="blk" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
       <div class="sec" style="padding:18px 20px"><div style="font-weight:700;margin-bottom:6px">✦ AI 검토 ${Settings.aiReady() ? `<span class="pill" style="color:var(--ok)">${Settings.resolve() === 'shared' ? '공용 AI 사용 가능' : '내 키 사용 중'}</span>` : '<span class="pill" style="color:var(--warn)">미설정</span>'}</div>
-        <div style="font-size:13px;color:var(--text-2)">${Shared.ok ? '설정 없이 바로 쓸 수 있습니다. 공용 AI는 하루 사용 횟수에 제한이 있고, 공개하면 안 되는 문서는 본인 API 키를 넣어 쓰는 것을 권합니다.' : 'API 키를 하나 넣으면 섹션별 검토 · 관점별 전체 검토 · 메모 자동 분류 · 문서 기반 채팅을 쓸 수 있습니다. Gemini는 무료 등급 키로도 동작합니다.'}</div>
+        <div style="font-size:13px;color:var(--text-2)">${Shared.ok ? '설정 없이 바로 쓸 수 있습니다. 공용 AI는 하루 사용 횟수에 제한이 있고, 공개하면 안 되는 문서는 본인 API 키를 넣어 쓰는 것을 권합니다.' : 'API 키를 하나 넣으면 섹션별 검토 · 관점별 전체 검토 · 메모 자동 분류 · 문서 기반 채팅을 쓸 수 있습니다.'}</div>
         <button class="btn btn-sm" style="margin-top:12px" onclick="Settings.open()">AI 설정</button></div>
       <div class="sec" style="padding:18px 20px"><div style="font-weight:700;margin-bottom:6px">내 문서는 어디에 저장되나요</div>
         <div style="font-size:13px;color:var(--text-2)">서버가 아니라 <b>지금 쓰는 브라우저 안</b>에 저장됩니다. 회원가입이 없는 대신, 다른 기기에서는 보이지 않고 브라우저 데이터를 지우면 사라집니다. 백업 파일(JSON)을 받아 두면 어디서든 복원할 수 있습니다.</div>
